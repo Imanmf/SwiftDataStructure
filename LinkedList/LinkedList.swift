@@ -18,7 +18,7 @@
  */
 
 public class LinkedList<T> {
-    
+    //MARK: - private
     // The current length of the list.
     private var size: Int
     
@@ -29,7 +29,7 @@ public class LinkedList<T> {
     private var last: Entry<T>?
     
     // Class to represent an entry in the list. Holds a single element.
-    private final class Entry<S> {
+    private final class Entry<S>: CustomStringConvertible, CustomDebugStringConvertible {
         
         // Entry uniq id
         private var id: UUID
@@ -57,21 +57,18 @@ public class LinkedList<T> {
         public static func==(lhs: Entry, rhs: Entry) -> Bool {
             return (lhs.id == rhs.id)
         }
+        
+        public var description: String {
+            guard let next = next else {
+                return "\(String(describing: data)) /."
+            }
+            return "\(String(describing: data)) <-> " + String(describing: next) + " "
+        }
+        
+        var debugDescription: String {
+            return description
+        }
     } // class Entry
-    
-    private struct IndexOutOfBoundsException : Error {
-        
-        private let message = "LinkedList out of range"
-        private var reason: String
-        
-        public init(reason: String) {
-            self.reason = reason
-        }
-        
-        public var localizedDescription:  String {
-            return "\(message), \(reason)"
-        }
-    } // struct IndexOutOfBoundsException
     
     /**
      Obtain the Entry at a given position in a list. This method of course
@@ -79,8 +76,6 @@ public class LinkedList<T> {
      paths to get to the Entry required. This implies that the first or last
      entry in the list is obtained in constant time, which is a very desirable
      property.
-     For speed and flexibility, range checking is not done in this method:
-     Incorrect values will be returned if (n &lt; 0) or (n &gt;= size).
      
      - Parameter n: the number of the entry to get
      - Returns: the entry at position n
@@ -149,26 +144,29 @@ public class LinkedList<T> {
      Checks that the index is in the range of possible elements (inclusive).
      
      - Parameter index: the index to check
-     - Throws: IndexOutOfBoundsException if index &lt; 0 || index &gt; size
+     - Returns: true if index is in range, flase if index is out of range
      */
-    private func checkBoundsInclusive(_ index: Int) throws {
+    private func checkBoundsInclusive(_ index: Int) -> Bool {
         if index < 0 || index > self.size {
-            throw IndexOutOfBoundsException(reason: "Index: \(index), Size: \(self.size)")
+            return false
         }
+        return true
     }
     
     /**
      Checks that the index is in the range of existing elements (exclusive).
      
      - Parameter index: the index to check
-     - Throws: IndexOutOfBoundsException if index &lt; 0 || index &gt;= size
+     - Returns: true if index is in range, flase if index is out of range
      */
-    private func checkBoundsExclusive(_ index: Int) throws {
+    private func checkBoundsExclusive(_ index: Int) -> Bool {
         if index < 0 || index >= self.size {
-            throw IndexOutOfBoundsException(reason: "Index: \(index), Size: \(self.size)")
+            return false
         }
+        return true
     }
     
+    //MARK: - public functions
     //Create an empty linked list.
     public init() {
         self.size = 0
@@ -180,8 +178,7 @@ public class LinkedList<T> {
      Create a linked list containing the elements, in order, of a given
      collection.
      
-     @param c the collection to populate this list from
-     @throws NullPointerException if c is null
+     - Parameter c: the collection to populate this list from
      */
     public convenience init(_ c: some Collection<T>) {
         self.init()
@@ -286,12 +283,9 @@ public class LinkedList<T> {
      Adds an element to the end of the list.
      
      - Parameter o: the entry to add
-     - Returns: true, as it always succeeds
      */
-    @discardableResult
-    public func add(_ o: T) -> Bool {
+    public func add(_ o: T) {
         self.addLastEntry(Entry(data: o))
-        return true
     }
     
     /**
@@ -299,9 +293,8 @@ public class LinkedList<T> {
      this list. If this list is modified externally (for example, if this
      list is the collection), behavior is unspecified.
      
-     @param c the collection to append
-     @return true if the list was modified
-     @throws NullPointerException if c is null
+     - Parameter c: the collection to append
+     - Returns: true if the list was modified
      */
     @discardableResult
     public func addAll(_ c: some Collection<T>) -> Bool {
@@ -313,68 +306,105 @@ public class LinkedList<T> {
      index of this list. If this list is modified externally (for example,
       if this list is the collection), behavior is unspecified.
      
-     @param c the collection to append
-     @return true if the list was modified
-     @throws NullPointerException if c is null
-     @throws IndexOutOfBoundsException if index &lt; 0 || index &gt; size()
+     - Parameter c: the collection to append
+     - Returns: true if the list was modified
      */
     @discardableResult
     public func addAll(index: Int, _ c: some Collection<T>) -> Bool {
-        do {
-            try checkBoundsInclusive(index)
-            let cSize = c.count
-            
-            if cSize == 0 { return false }
-            var itr = c.makeIterator()
-            
-            // Get the entries just before and after index. If index is at the start
-            // of the list, BEFORE is null. If index is at the end of the list, AFTER
-            // is null. If the list is empty, both are null.
-            var after: Entry<T>? = nil
-            var before: Entry<T>? = nil
-            if index != self.size {
-                after = getEntry(index)
-                before = after?.previous
-            } else {
-                before = self.last
-            }
-            
-            // Create the first new entry. We do not yet set the link from `before'
-            // to the first entry, in order to deal with the case where (c == this).
-            // [Actually, we don't have to handle this case to fufill the
-            // contract for addAll(), but Sun's implementation appears to.]
-            guard let data = itr.next() else { return false }
-            var e = Entry(data: data)
-            e.previous = before
-            var prev = e
-            let firstNew = e
-            
-            // Create and link all the remaining entries.
-            for _ in 1..<cSize {
-                guard let data = itr.next() else { return false }
-                e = Entry(data: data)
-                e.previous = prev
-                prev.next = e
-                prev = e
-            }
-            
-            self.size += cSize
-            prev.next = after
-            if after != nil {
-                after?.previous = e
-            } else {
-                last = e
-            }
-            
-            if before != nil {
-                before?.next = firstNew
-            } else {
-                self.first = firstNew
-            }
-            
-        } catch {
-            return false
+        guard checkBoundsInclusive(index) else { return false}
+        let cSize = c.count
+        
+        if cSize == 0 { return false }
+        var itr = c.makeIterator()
+        
+        // Get the entries just before and after index. If index is at the start
+        // of the list, BEFORE is null. If index is at the end of the list, AFTER
+        // is null. If the list is empty, both are null.
+        var after: Entry<T>? = nil
+        var before: Entry<T>? = nil
+        if index != self.size {
+            after = getEntry(index)
+            before = after?.previous
+        } else {
+            before = self.last
         }
+        
+        // Create the first new entry. We do not yet set the link from `before'
+        // to the first entry, in order to deal with the case where (c == this).
+        // [Actually, we don't have to handle this case to fufill the
+        // contract for addAll(), but Sun's implementation appears to.]
+        guard let data = itr.next() else { return false }
+        var e = Entry(data: data)
+        e.previous = before
+        var prev = e
+        let firstNew = e
+        
+        // Create and link all the remaining entries.
+        for _ in 1..<cSize {
+            guard let data = itr.next() else { return false }
+            e = Entry(data: data)
+            e.previous = prev
+            prev.next = e
+            prev = e
+        }
+        
+        self.size += cSize
+        prev.next = after
+        if after != nil {
+            after?.previous = e
+        } else {
+            last = e
+        }
+        
+        if before != nil {
+            before?.next = firstNew
+        } else {
+            self.first = firstNew
+        }
+        
+        return true
+    }
+    
+    /**
+     Insert the linkedlist at the given index of this list.
+     
+     - Parameter l: the linkedlist to append
+     - Returns: true if the list was modified
+     */
+    @discardableResult
+    public func addAll(index: Int, _ l: LinkedList<T>) -> Bool {
+        guard checkBoundsInclusive(index) else { return false}
+        let cSize = l.count
+        
+        if cSize == 0 { return false }
+        
+        // is null. If the list is empty, both are null.
+        var after: Entry<T>? = nil
+        var before: Entry<T>? = nil
+        if index != self.size {
+            after = getEntry(index)
+            before = after?.previous
+            
+            l.first?.previous = before
+            before?.next = l.first
+            l.last?.next = after
+            after?.previous = l.last
+        } else {
+            before = self.last
+            
+            before?.next = l.first
+            l.first?.previous = before
+        }
+        self.size += cSize
+        
+        if after == nil {
+            self.last = l.last
+        }
+        
+        if before == nil {
+            self.first = l.first
+        }
+        
         return true
     }
     
@@ -390,92 +420,84 @@ public class LinkedList<T> {
     /**
      Return the element at index.
      
-     @param index the place to look
-     @return the element at index
-     @throws IndexOutOfBoundsException if index &lt; 0 || index &gt;= size()
+     - Parameter index: the place to look
+     - Returns: the element at index, nil if index is out of range
      */
     public func get(index: Int) -> T? {
-        do {
-            try checkBoundsExclusive(index)
-            return getEntry(index)?.data
-        } catch {
-            return nil
-        }
+        guard checkBoundsExclusive(index) else { return nil }
+        return getEntry(index)?.data
     }
     
     /**
      Replace the element at the given location in the list.
      
-     @param index which index to change
-     @param o the new element
-     @return the prior element
-     @throws IndexOutOfBoundsException if index &lt; 0 || index &gt;= size()
+     - Parameter index: which index to change
+     - Parameter o: the new element
+     - Returns: the prior element, nil if index is out of range
      */
     @discardableResult
     public func set(index: Int, _ o: T) -> T? {
-        do {
-            try checkBoundsExclusive(index)
-            let e = getEntry(index)
-            let old = e?.data
-            e?.data = o
-            return old
-        } catch {
-            return nil
-        }
+        guard checkBoundsExclusive(index) else { return nil }
+        let e = getEntry(index)
+        let old = e?.data
+        e?.data = o
+        return old
     }
     
     /**
      Inserts an element in the given position in the list.
      
-     @param index where to insert the element
-     @param o the element to insert
-     @throws IndexOutOfBoundsException if index &lt; 0 || index &gt; size()
+     - Parameter index: where to insert the element
+     - Parameter o: the element to insert
      */
     public func add(index: Int, _ o: T) {
-        do {
-            try checkBoundsInclusive(index)
-            let e = Entry(data: o)
-            
-            if index < self.size {
-                let after = getEntry(index)
-                e.next = after
-                e.previous = after?.previous
-                if after?.previous == nil {
-                    first = e
-                } else {
-                    after?.previous?.next = e
-                }
-                after?.previous = e
-                size += 1
+        guard checkBoundsInclusive(index) else { return }
+        let e = Entry(data: o)
+        
+        if index < self.size {
+            let after = getEntry(index)
+            e.next = after
+            e.previous = after?.previous
+            if after?.previous == nil {
+                first = e
             } else {
-                self.addLastEntry(e)
+                after?.previous?.next = e
             }
-        } catch {}
+            after?.previous = e
+            size += 1
+        } else {
+            self.addLastEntry(e)
+        }
     }
     
     /**
      Removes the element at the given position from the list.
      
-     @param index the location of the element to remove
-     @return the removed element
-     @throws IndexOutOfBoundsException if index &lt; 0 || index &gt; size()
+     - Parameter index: the location of the element to remove
+     - Returns: the removed element, nil if index is out of range
      */
     @discardableResult
     public func remove(index: Int) -> T? {
-        do {
-            try checkBoundsExclusive(index)
-            let e = getEntry(index)!
-            removeEntry(e)
-            return e.data
-        } catch {
-            return nil
-        }
+        guard checkBoundsExclusive(index) else { return nil }
+        let e = getEntry(index)!
+        removeEntry(e)
+        return e.data
     }
     
+    @discardableResult
+    public static func+=(lhs: LinkedList, rhs: LinkedList) -> Bool {
+        return lhs.addAll(index: lhs.size, rhs)
+    }
+    
+    public static func+(lhs: LinkedList, rhs: LinkedList) -> LinkedList {
+        lhs.addAll(index: lhs.size, rhs)
+        return lhs
+    }
+    //MARK: - public get variables
     /**
      Returns an array which contains the elements of the list in order.
      
-     @return an array containing the list elements
+     - Returns: an array containing the list elements
     */
     public var toArray: [T] {
         var array: [T] = []
@@ -497,14 +519,14 @@ public class LinkedList<T> {
     }
 }
 
+//MARK: Equatable Objects
 extension LinkedList where T : Equatable {
     
     /**
-     Returns true if the list contains the given object. Comparison is done by
-     <code>o == null ? e = null : o.equals(e)</code>.
+     Returns true if the list contains the given object.
      
-     @param o the element to look for
-     @return true if it is found
+     - Parameter o: the element to look for
+     - Returns: true if it is found
      */
     public func contains(_ o: T) -> Bool {
         var e = self.first
@@ -519,10 +541,10 @@ extension LinkedList where T : Equatable {
     
     /**
      Removes the entry at the lowest index in the list that matches the given
-     object, comparing by <code>o == null ? e = null : o.equals(e)</code>.
+     object.
      
-     @param o the object to remove
-     @return true if an instance of the object was removed
+     - Parameter o: the object to remove
+     - Returns: true if an instance of the object was removed, nil if o is not  exist
      */
     @discardableResult
     public func remove(_ o: T) -> Bool {
@@ -538,10 +560,10 @@ extension LinkedList where T : Equatable {
     }
     
     /**
-     Returns the first index where the element is located in the list, or -1.
+     Returns the first index where the element is located in the list, or nil.
      
-     @param o the element to look for
-     @return its position, or -1 if not found
+     - Parameter o: the element to look for
+     - Returns: its position, or nil if not found
      */
     public func indexOf(_ o: T) -> Int? {
         var index = 0
@@ -557,10 +579,10 @@ extension LinkedList where T : Equatable {
     }
     
     /**
-     Returns the last index where the element is located in the list, or -1.
+     Returns the last index where the element is located in the list, or nil.
      
-     @param o the element to look for
-     @return its position, or -1 if not found
+     - Parameter o: the element to look for
+     - Returns: its position, or nil if not found
      */
     public func lastIndexOf(_ o: T) -> Int? {
         var index = self.size - 1
@@ -573,5 +595,19 @@ extension LinkedList where T : Equatable {
             e = e?.previous
         }
         return nil
+    }
+}
+
+//MARK: - CustomStringConvertible
+extension LinkedList: CustomStringConvertible, CustomDebugStringConvertible {
+    public var debugDescription: String {
+        return description
+    }
+    
+    public var description: String {
+        guard let first = first else {
+            return "Empty list"
+        }
+        return String(describing: first)
     }
 }

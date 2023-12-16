@@ -46,9 +46,19 @@ final class LinkedListTest: XCTestCase {
     }
     
     func testAddAll() {
-        testList = LinkedList<Int>([1, 2, 3, 4, 5])
-        testList.addAll(index: 3, [20,  30, 40, 50,  60])
+        testList = LinkedList<Int>([1, 2, 3, 7, 8])
+        testList.addAll(index: 3, [4, 5, 6])
+        XCTAssertEqual(testList.count, 8, "Some thing went wrong")
+        let testListTemp1 = LinkedList<Int>([9, 10])
+        
+        testList = testList + testListTemp1
         XCTAssertEqual(testList.count, 10, "Some thing went wrong")
+        XCTAssertEqual("\(testList!)".replacingOccurrences(of: " ", with: ""), "1<->2<->3<->4<->5<->6<->7<->8<->9<->10/.", "Some thing went wrong")
+        let testListTemp2 = LinkedList<Int>([11, 12])
+        testList += testListTemp2
+        XCTAssertEqual(testList.count, 12, "Some thing went wrong")
+        XCTAssertEqual("\(testList!)".replacingOccurrences(of: " ", with: ""), "1<->2<->3<->4<->5<->6<->7<->8<->9<->10<->11<->12/.", "Some thing went wrong")
+        
     }
 
     func testExample() throws {
