@@ -22,7 +22,7 @@ Pod::Spec.new do |spec|
 #   spec.tvos.deployment_target = "9.0"
 #   spec.visionos.deployment_target = "1.0"
 
-  spec.source       = { :git => "https://github.com/Imanmf/SwiftLinkedList.git", :tag => "#{spec.version}" }
+  spec.source       = { :git => "https://github.com/Imanmf/SwiftDataStructure.git", :tag => "#{spec.version}" }
   spec.source_files  = "LinkedList/**/*.swift"
   spec.swift_versions = ['5.0', '5.1', '5.2', '5.3']
 
